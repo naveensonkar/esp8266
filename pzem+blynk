@@ -1,9 +1,9 @@
 #include <WiFiManager.h>  // Add WiFiManager library
 
 #define D4 2  // Assuming D4 is mapped to GPIO 2 on your NodeMCU
-#define BLYNK_TEMPLATE_ID "TMPL3z4GQDOXQ"
+#define BLYNK_TEMPLATE_ID ""
 #define BLYNK_TEMPLATE_NAME "Energy Meter"
-#define BLYNK_AUTH_TOKEN "JN5H4eJhQdpfDAYUaOKCwQLIWfKr3EaJ"
+#define BLYNK_AUTH_TOKEN ""
 
 char auth[] = BLYNK_AUTH_TOKEN;
 
