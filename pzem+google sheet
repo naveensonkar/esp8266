@@ -2,9 +2,9 @@
 #include <WiFiClientSecure.h>
 
 #define D4 2  // Assuming D4 is mapped to GPIO 2 on your NodeMCU
-#define BLYNK_TEMPLATE_ID "TMPL3z4GQDOXQ"
+#define BLYNK_TEMPLATE_ID ""
 #define BLYNK_TEMPLATE_NAME "Energy Meter"
-#define BLYNK_AUTH_TOKEN "JN5H4eJhQdpfDAYUaOKCwQLIWfKr3EaJ"
+#define BLYNK_AUTH_TOKEN ""
 
 char auth[] = BLYNK_AUTH_TOKEN;
 
@@ -36,7 +36,7 @@ const int httpsPort = 443;
 
 WiFiClientSecure client; //--> Create a WiFiClientSecure object.
 
-String GAS_ID = "AKfycbxiQRo3Yp1T3-CIgBPSeAPFjeI58JpiBC68BnjbTJNfgGWrVNJ_1YJ2ESmwwobBJxDfTA"; //--> spreadsheet script ID
+String GAS_ID = ""; //--> spreadsheet script ID
 
 void setup()
 {
@@ -81,7 +81,7 @@ void loop()
   CURRENT = zeroIfNan(CURRENT);
   POWER = pzem.power();
   POWER = zeroIfNan(POWER);
-  energy1 = pzem.energy() / 1000.0; // Corrected: divide by 1000.0 for correct kWh
+  energy1 = pzem.energy(); // Corrected: divide by 1000.0 for correct kWh
   energy1 = zeroIfNan(energy1);
   Freq = pzem.frequency();
   Freq = zeroIfNan(Freq);
