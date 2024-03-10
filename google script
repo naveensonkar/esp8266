@@ -1,5 +1,3 @@
-// This is google script for pzem+google sheet
-
 function doGet(e) {
   Logger.log(JSON.stringify(e));
   var result = 'Ok';
@@ -7,7 +5,8 @@ function doGet(e) {
   if (e.parameter == 'undefined') {
     result = 'No Parameters';
   } else {
-    var sheet_id = '1LiqXVYyHsJHfP6bemu0nafpuwaUddrpuBdYYJ9m260g'; // Spreadsheet ID
+    var sheet_id = ''; // Spreadsheet ID
+
     var sheet = SpreadsheetApp.openById(sheet_id).getActiveSheet();
     var newRow = sheet.getLastRow() + 1;
     var rowData = [];
