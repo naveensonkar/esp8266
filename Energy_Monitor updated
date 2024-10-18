@@ -1,0 +1,186 @@
+#include <WiFiManager.h>  // Add WiFiManager library
+
+#define D4 2  // Assuming D4 is mapped to GPIO 2 on your NodeMCU
+#define BLYNK_TEMPLATE_ID "TMPL3z4GQDOXQ"
+#define BLYNK_TEMPLATE_NAME "Energy Meter"
+#define BLYNK_AUTH_TOKEN "JN5H4eJhQdpfDAYUaOKCwQLIWfKr3EaJ"
+
+char auth[] = BLYNK_AUTH_TOKEN;
+
+#define BLYNK_PRINT Serial
+#include <ESP8266WiFi.h>
+#include <BlynkSimpleEsp8266.h>
+#include <PZEM004Tv30.h>
+#include <ESP8266WebServer.h>
+
+PZEM004Tv30 pzem(14, 12); // GPIO14(D5) to Tx PZEM004; GPIO12(D6) to Rx PZEM004
+float VOLTAGE, CURRENT, POWER, Freq, pf, va1, VAR1, energy1;
+float Time;
+
+#define wifi_led D4
+
+ESP8266WebServer server(80);
+
+// Time variables
+unsigned long startTime;
+unsigned long elapsedHours;
+unsigned long elapsedMinutes;
+unsigned long elapsedSeconds;
+String uptimeString; // Variable to store the formatted uptime
+
+void setup() {
+  Serial.begin(115200);
+
+  // WiFiManager to connect to local Wi-Fi
+  WiFiManager wifiManager;
+  wifiManager.autoConnect("Esp8266");
+  
+  // Start Blynk (only if connected to the internet)
+  if (WiFi.status() == WL_CONNECTED) {
+    Blynk.begin(auth, WiFi.SSID().c_str(), WiFi.psk().c_str());
+  }
+
+  // Serve a webpage at the root URL
+  server.on("/", HTTP_GET, handleRoot);
+
+  // Start the server
+  server.begin();
+  Serial.println("Web server started. Access the webpage at: http://" +  WiFi.localIP().toString());
+
+  startTime = millis(); // Store the current time when the device powers on
+}
+
+void loop() {
+  unsigned long currentTime = millis(); // Get the current time in each iteration
+
+  Blynk.run(); // Run Blynk if connected
+  wifi_testing(); // Check Wi-Fi connected
+
+  // Update uptime information
+  unsigned long elapsedTime = millis() - startTime;
+  unsigned long elapsedHours = elapsedTime / 3600000;
+  unsigned long elapsedMinutes = (elapsedTime % 3600000) / 60000;
+  unsigned long elapsedSeconds = (elapsedTime % 60000) / 1000;
+
+  // Measure energy metrics
+  VOLTAGE = pzem.voltage();
+  VOLTAGE = zeroIfNan(VOLTAGE);
+  CURRENT = pzem.current();
+  CURRENT = zeroIfNan(CURRENT);
+  POWER = pzem.power();
+  POWER = zeroIfNan(POWER);
+  energy1 = pzem.energy(); // kWh
+  energy1 = zeroIfNan(energy1);
+  Freq = pzem.frequency();
+  Freq = zeroIfNan(Freq);
+  pf = pzem.pf();
+  pf = zeroIfNan(pf);
+
+  if (pf == 0) {
+    va1 = 0;
+    VAR1 = 0;
+  }
+  else {
+    va1 = POWER / pf;
+    VAR1 = POWER / pf * sqrt(1 - sq(pf));
+  }
+
+  Serial.println("");
+ 
+  // Update the uptimeString variable with the formatted uptime
+  if (elapsedHours > 0) {
+    uptimeString = String(elapsedHours) + " Hours " + String(elapsedMinutes) + " Minutes " + String(elapsedSeconds) + " Seconds";
+  } else if (elapsedMinutes > 0) {
+    uptimeString = String(elapsedMinutes) + " Minutes " + String(elapsedSeconds) + " Seconds";
+  } else {
+    uptimeString = String(elapsedSeconds) + " Seconds";
+  }
+
+  // Print to Serial Monitor
+  Serial.printf("Uptime     : %s\n", uptimeString.c_str());
+  Serial.printf("Voltage        : %.2f\ V\n", VOLTAGE);
+  Serial.printf("Current        : %.2f\ A\n", CURRENT);
+  Serial.printf("Power Active   : %.2f\ W\n", POWER);
+  Serial.printf("Energy         : %.7f kWh\n", energy1);
+  Serial.printf("Frequency      : %.2f\ Hz\n", Freq);
+  Serial.printf("Cosine Phi     : %.2f\ PF\n", pf);
+  Serial.printf("Apparent Power : %.2f\ VA\n", va1);
+  Serial.printf("Reactive Power : %.2f\ VAR\n", VAR1);
+  Serial.printf("---------- END ----------");
+  Serial.printf("WebPage %s", WiFi.localIP().toString().c_str());
+  Serial.println("");
+
+  // Handle incoming HTTP requests
+  server.handleClient();
+
+  Blynk.run();
+  Blynk.virtualWrite(V0, VOLTAGE);
+  Blynk.virtualWrite(V1, CURRENT);
+  Blynk.virtualWrite(V2, POWER);
+  Blynk.virtualWrite(V3, energy1);
+  Blynk.virtualWrite(V4, elapsedHours * 3600 + elapsedMinutes * 60 + elapsedSeconds);
+  Blynk.run();
+}
+
+void handleRoot() {
+  // Check internet connection
+  String connectionStatus = isInternetConnected() ? "Online" : "Offline";
+
+  // Build the HTML responce
+  String html = "<html><head><meta http-equiv='refresh' content='1'></head><body>"; // Refresh every 1 second
+  html += "<h1>Energy Meter - " + connectionStatus + "</h1>";
+  html += "<h2>Uptime: " + uptimeString + "</h2>";
+  html += "<p>Voltage: " + String(VOLTAGE) + " V</p>";
+  html += "<p>Current: " + String(CURRENT) + " A</p>";
+  html += "<p>Power: " + String(POWER) + " W</p>";
+  html += "<p>Energy: " + String(energy1, 8) + " kWh</p>";
+  html += "<p>Frequency: " + String(Freq) + " Hz</p>";
+  html += "<p>Power Factor: " + String(pf) + "</p>";
+  html += "<p>Apparent Power: " + String(va1) + " VA</p>";
+  html += "<p>Reactive Power: " + String(VAR1) + " VAR</p>";
+  html += "</body></html>";
+  server.send(200, "text/html", html);
+}
+
+bool isInternetConnected() {
+  WiFiClient client;
+  return client.connect("www.google.com", 80); // Simple check to see if Google is reachable
+}
+
+BLYNK_WRITE(V6)
+{
+  int buttonState = param.asInt();
+  if (buttonState == 1)
+  {
+    // Reset energy value
+    pzem.resetEnergy();
+
+    Serial.println("Energy Reset Command Sent");
+  }
+}
+
+float zeroIfNan(float v)
+{
+  if (isnan(v))
+    v = 0;
+  return v;
+}
+
+void wifi_testing()
+{
+  unsigned long current = millis();
+  unsigned long old = current;
+  const int interval = 10; // Set the interval in seconds
+
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(250);
+    Serial.print(".");
+    digitalWrite(wifi_led, HIGH);
+    delay(250);
+    digitalWrite(wifi_led, LOW);
+    current = millis();
+    if ((current - old) / 1000 > interval)
+      ESP.restart();
+  }
+}
